@@ -8,36 +8,55 @@ import { Label } from "@/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Textarea } from "@/ui/textarea";
 import { Plus } from "lucide-react";
+import { Transaction } from "../types/transaction";
+import { toast } from "sonner";
 
 interface CreateTransactionDialogProps {
   accounts: Array<{ id: string; name: string }>;
   categories: Array<{ id: string; name: string; type: string; parentId?: string }>;
   onSuccess?: () => void;
+  onOptimisticCreate?: (transaction: Transaction) => void;
 }
 
-export function CreateTransactionDialog({ accounts, categories, onSuccess }: CreateTransactionDialogProps) {
+export function CreateTransactionDialog({ accounts, categories, onSuccess, onOptimisticCreate }: CreateTransactionDialogProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [type, setType] = useState<"income" | "expense">("expense");
 
-  const parentCategories = categories.filter(c => !c.parentId && c.type === type);
-  const [selectedParent, setSelectedParent] = useState<string>();
-  const subcategories = selectedParent 
-    ? categories.filter(c => c.parentId === selectedParent)
-    : [];
+  const filteredCategories = categories.filter(c => c.type === type);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setIsLoading(true);
 
     const formData = new FormData(e.currentTarget);
-    const data = {
+    const dateStr = formData.get("date") as string;
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const now = new Date();
+    const dateTime = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+    
+    const categoryName = formData.get("category") as string;
+    
+    const newTransaction: Transaction = {
+      id: crypto.randomUUID(),
       type,
       amount: parseFloat(formData.get("amount") as string),
-      category: formData.get("category"),
+      category: categoryName,
+      description: (formData.get("description") as string) || "Sin descripción",
+      date: dateTime,
+      account: formData.get("account") as string,
+    };
+
+    onOptimisticCreate?.(newTransaction);
+    setOpen(false);
+
+    const data = {
+      type,
+      amount: newTransaction.amount,
+      category: categoryName,
       description: formData.get("description"),
-      date: new Date(formData.get("date") as string).toISOString(),
-      account: formData.get("account"),
+      date: dateTime.toISOString(),
+      account: newTransaction.account,
     };
 
     try {
@@ -46,8 +65,9 @@ export function CreateTransactionDialog({ accounts, categories, onSuccess }: Cre
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      setOpen(false);
       onSuccess?.();
+    } catch {
+      toast.error("Error al crear la transacción");
     } finally {
       setIsLoading(false);
     }
@@ -84,35 +104,17 @@ export function CreateTransactionDialog({ accounts, categories, onSuccess }: Cre
           </div>
           <div>
             <Label htmlFor="category">Categoría</Label>
-            <Select name="parentCategory" value={selectedParent} onValueChange={setSelectedParent}>
+            <Select name="category" required>
               <SelectTrigger>
                 <SelectValue placeholder="Selecciona categoría" />
               </SelectTrigger>
               <SelectContent>
-                {parentCategories.map(cat => (
-                  <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                {filteredCategories.map(cat => (
+                  <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          {subcategories.length > 0 && (
-            <div>
-              <Label htmlFor="subcategory">Subcategoría</Label>
-              <Select name="category" required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona subcategoría" />
-                </SelectTrigger>
-                <SelectContent>
-                  {subcategories.map(cat => (
-                    <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          {subcategories.length === 0 && selectedParent && (
-            <input type="hidden" name="category" value={parentCategories.find(c => c.id === selectedParent)?.name} />
-          )}
           <div>
             <Label htmlFor="account">Cuenta</Label>
             <Select name="account" required>

@@ -1,8 +1,15 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import {
+  useState,
+  useMemo,
+  Fragment,
+  useOptimistic,
+  startTransition,
+} from "react";
 import { Transaction } from "../types/transaction";
 import { groupTransactionsByDate } from "../utils/group-transactions";
+import { deleteTransactionsAction } from "../actions/delete-transactions";
 import { Input } from "@/ui/input";
 import { Button } from "@/ui/button";
 import { Badge } from "@/ui/badge";
@@ -14,14 +21,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/ui/table";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Label } from "@/ui/label";
 import { Checkbox } from "@/ui/checkbox";
-import { Search, Filter, X, CalendarIcon } from "lucide-react";
+import { Search, Filter, X, CalendarIcon, Trash2, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -31,6 +34,17 @@ import {
   PopoverContent as DatePopoverContent,
   PopoverTrigger as DatePopoverTrigger,
 } from "@/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/ui/alert-dialog";
+import { toast } from "sonner";
 
 type FilterSection = "type" | "category" | "date" | "amount" | "account";
 
@@ -38,7 +52,15 @@ interface TransactionsDataTableProps {
   transactions: Transaction[];
 }
 
-export function TransactionsDataTable({ transactions }: TransactionsDataTableProps) {
+export function TransactionsDataTable({
+  transactions,
+}: TransactionsDataTableProps) {
+  const [optimisticTransactions, setOptimisticTransactions] = useOptimistic(
+    transactions,
+    (state, deletedIds: string[]) =>
+      state.filter((t) => !deletedIds.includes(t.id)),
+  );
+
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<("income" | "expense")[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
@@ -50,39 +72,68 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const [tempTypeFilter, setTempTypeFilter] = useState<("income" | "expense")[]>([]);
+  const [tempTypeFilter, setTempTypeFilter] = useState<
+    ("income" | "expense")[]
+  >([]);
   const [tempCategoryFilter, setTempCategoryFilter] = useState<string[]>([]);
   const [tempAccountFilter, setTempAccountFilter] = useState<string[]>([]);
-  const [tempDateRange, setTempDateRange] = useState<{ from?: Date; to?: Date }>({});
+  const [tempDateRange, setTempDateRange] = useState<{
+    from?: Date;
+    to?: Date;
+  }>({});
   const [tempMinAmount, setTempMinAmount] = useState<string>("");
   const [tempMaxAmount, setTempMaxAmount] = useState<string>("");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const filteredTransactions = useMemo(() => {
-    return transactions.filter((t) => {
+    return optimisticTransactions.filter((t) => {
       const matchesSearch =
         search === "" ||
-        t.description?.toLowerCase().includes(search.toLowerCase()) ||
+        t.description.toLowerCase().includes(search.toLowerCase()) ||
         t.category.toLowerCase().includes(search.toLowerCase());
 
-      const matchesType = typeFilter.length === 0 || typeFilter.includes(t.type);
-      const matchesCategory = categoryFilter.length === 0 || categoryFilter.includes(t.category);
-      const matchesAccount = accountFilter.length === 0 || accountFilter.includes(t.account);
-      
-      const matchesDate = !dateRange?.from || !dateRange?.to ||
-        (new Date(t.date) >= dateRange.from && new Date(t.date) <= (dateRange.to || dateRange.from));
-      
-      const matchesAmount = 
+      const matchesType =
+        typeFilter.length === 0 || typeFilter.includes(t.type);
+      const matchesCategory =
+        categoryFilter.length === 0 || categoryFilter.includes(t.category);
+      const matchesAccount =
+        accountFilter.length === 0 || accountFilter.includes(t.account);
+
+      const matchesDate =
+        !dateRange?.from ||
+        !dateRange?.to ||
+        (new Date(t.date) >= dateRange.from &&
+          new Date(t.date) <= (dateRange.to || dateRange.from));
+
+      const matchesAmount =
         (!minAmount || t.amount >= parseFloat(minAmount)) &&
         (!maxAmount || t.amount <= parseFloat(maxAmount));
 
-      return matchesSearch && matchesType && matchesCategory && matchesAccount && matchesDate && matchesAmount;
+      return (
+        matchesSearch &&
+        matchesType &&
+        matchesCategory &&
+        matchesAccount &&
+        matchesDate &&
+        matchesAmount
+      );
     });
-  }, [transactions, search, typeFilter, categoryFilter, accountFilter, dateRange, minAmount, maxAmount]);
+  }, [
+    optimisticTransactions,
+    search,
+    typeFilter,
+    categoryFilter,
+    accountFilter,
+    dateRange,
+    minAmount,
+    maxAmount,
+  ]);
 
   const groupedData = useMemo(
     () => groupTransactionsByDate(filteredTransactions),
-    [filteredTransactions]
+    [filteredTransactions],
   );
 
   const paginatedGroups = useMemo(() => {
@@ -91,24 +142,35 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
     return groupedData.slice(startIndex, endIndex);
   }, [groupedData, currentPage, pageSize]);
 
+  const allVisibleIds = useMemo(
+    () => paginatedGroups.flatMap((g) => g.transactions.map((t) => t.id)),
+    [paginatedGroups],
+  );
+
+  const isAllSelected =
+    allVisibleIds.length > 0 &&
+    allVisibleIds.every((id) => selectedIds.has(id));
+  const isSomeSelected =
+    allVisibleIds.some((id) => selectedIds.has(id)) && !isAllSelected;
+
   const totalPages = Math.ceil(groupedData.length / pageSize);
 
   const categories = useMemo(
-    () => Array.from(new Set(transactions.map((t) => t.category))),
-    [transactions]
+    () => Array.from(new Set(optimisticTransactions.map((t) => t.category))),
+    [optimisticTransactions],
   );
 
   const accounts = useMemo(
-    () => Array.from(new Set(transactions.map((t) => t.account))),
-    [transactions]
+    () => Array.from(new Set(optimisticTransactions.map((t) => t.account))),
+    [optimisticTransactions],
   );
 
-  const hasActiveFilters = 
-    typeFilter.length > 0 || 
-    categoryFilter.length > 0 || 
-    accountFilter.length > 0 || 
-    dateRange?.from || 
-    minAmount || 
+  const hasActiveFilters =
+    typeFilter.length > 0 ||
+    categoryFilter.length > 0 ||
+    accountFilter.length > 0 ||
+    dateRange?.from ||
+    minAmount ||
     maxAmount;
 
   function clearFilters() {
@@ -128,8 +190,8 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
   }
 
   function toggleTempType(type: "income" | "expense") {
-    setTempTypeFilter((prev) => 
-      prev.includes(type) ? prev.filter((t) => t !== type) : [type]
+    setTempTypeFilter((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [type],
     );
   }
 
@@ -137,7 +199,7 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
     setTempCategoryFilter((prev) =>
       prev.includes(category)
         ? prev.filter((c) => c !== category)
-        : [...prev, category]
+        : [...prev, category],
     );
   }
 
@@ -145,7 +207,7 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
     setTempAccountFilter((prev) =>
       prev.includes(account)
         ? prev.filter((a) => a !== account)
-        : [...prev, account]
+        : [...prev, account],
     );
   }
 
@@ -171,6 +233,55 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
     setIsPopoverOpen(open);
   }
 
+  function toggleSelectAll() {
+    if (isAllSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(allVisibleIds));
+    }
+  }
+
+  function toggleSelectGroup(groupDate: string) {
+    const group = paginatedGroups.find((g) => g.date === groupDate);
+    if (!group) return;
+
+    const groupIds = group.transactions.map((t) => t.id);
+    const allGroupSelected = groupIds.every((id) => selectedIds.has(id));
+
+    const newSelected = new Set(selectedIds);
+    if (allGroupSelected) {
+      groupIds.forEach((id) => newSelected.delete(id));
+    } else {
+      groupIds.forEach((id) => newSelected.add(id));
+    }
+    setSelectedIds(newSelected);
+  }
+
+  function toggleSelectTransaction(id: string) {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  }
+
+  function handleDeleteSelected() {
+    const idsToDelete = Array.from(selectedIds);
+
+    setShowDeleteDialog(false);
+    setSelectedIds(new Set());
+
+    startTransition(() => {
+      setOptimisticTransactions(idsToDelete);
+
+      deleteTransactionsAction(idsToDelete).catch(() => {
+        toast.error("Error al eliminar las transacciones");
+      });
+    });
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex gap-4">
@@ -183,7 +294,7 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
             className="pl-9"
           />
         </div>
-        
+
         <Popover open={isPopoverOpen} onOpenChange={handleOpenChange}>
           <PopoverTrigger asChild>
             <Button variant={hasActiveFilters ? "default" : "outline"}>
@@ -191,7 +302,7 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
               Filtros
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-[500px] p-0" align="end">
+          <PopoverContent className="w-125 p-0" align="end">
             <div className="flex">
               <div className="w-40 border-r bg-muted/50 p-2">
                 <div className="space-y-1">
@@ -203,14 +314,18 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
                     Tipo
                   </Button>
                   <Button
-                    variant={activeSection === "category" ? "secondary" : "ghost"}
+                    variant={
+                      activeSection === "category" ? "secondary" : "ghost"
+                    }
                     className="w-full justify-start"
                     onClick={() => setActiveSection("category")}
                   >
                     Categoría
                   </Button>
                   <Button
-                    variant={activeSection === "account" ? "secondary" : "ghost"}
+                    variant={
+                      activeSection === "account" ? "secondary" : "ghost"
+                    }
                     className="w-full justify-start"
                     onClick={() => setActiveSection("account")}
                   >
@@ -236,7 +351,9 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
               <div className="flex-1 p-4">
                 {activeSection === "type" && (
                   <div className="space-y-3">
-                    <Label className="text-base font-semibold">Tipo de transacción</Label>
+                    <Label className="text-base font-semibold">
+                      Tipo de transacción
+                    </Label>
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2">
                         <Checkbox
@@ -244,7 +361,10 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
                           checked={tempTypeFilter.includes("income")}
                           onCheckedChange={() => toggleTempType("income")}
                         />
-                        <label htmlFor="type-income" className="text-sm cursor-pointer">
+                        <label
+                          htmlFor="type-income"
+                          className="text-sm cursor-pointer"
+                        >
                           Ingresos
                         </label>
                       </div>
@@ -254,7 +374,10 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
                           checked={tempTypeFilter.includes("expense")}
                           onCheckedChange={() => toggleTempType("expense")}
                         />
-                        <label htmlFor="type-expense" className="text-sm cursor-pointer">
+                        <label
+                          htmlFor="type-expense"
+                          className="text-sm cursor-pointer"
+                        >
                           Gastos
                         </label>
                       </div>
@@ -273,7 +396,10 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
                             checked={tempCategoryFilter.includes(cat)}
                             onCheckedChange={() => toggleTempCategory(cat)}
                           />
-                          <label htmlFor={`cat-${cat}`} className="text-sm cursor-pointer">
+                          <label
+                            htmlFor={`cat-${cat}`}
+                            className="text-sm cursor-pointer"
+                          >
                             {cat}
                           </label>
                         </div>
@@ -293,7 +419,10 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
                             checked={tempAccountFilter.includes(acc)}
                             onCheckedChange={() => toggleTempAccount(acc)}
                           />
-                          <label htmlFor={`acc-${acc}`} className="text-sm cursor-pointer">
+                          <label
+                            htmlFor={`acc-${acc}`}
+                            className="text-sm cursor-pointer"
+                          >
                             {acc}
                           </label>
                         </div>
@@ -304,10 +433,14 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
 
                 {activeSection === "date" && (
                   <div className="space-y-3">
-                    <Label className="text-base font-semibold">Rango de fechas</Label>
+                    <Label className="text-base font-semibold">
+                      Rango de fechas
+                    </Label>
                     <div className="space-y-2">
                       <div>
-                        <Label htmlFor="date-from" className="text-sm">Desde</Label>
+                        <Label htmlFor="date-from" className="text-sm">
+                          Desde
+                        </Label>
                         <DatePopover>
                           <DatePopoverTrigger asChild>
                             <Button
@@ -315,29 +448,39 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
                               variant="outline"
                               className={cn(
                                 "w-full justify-start text-left font-normal",
-                                !tempDateRange?.from && "text-muted-foreground"
+                                !tempDateRange?.from && "text-muted-foreground",
                               )}
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {tempDateRange?.from ? (
-                                format(tempDateRange.from, "PPP", { locale: es })
-                              ) : (
-                                "Seleccionar fecha"
-                              )}
+                              {tempDateRange?.from
+                                ? format(tempDateRange.from, "PPP", {
+                                    locale: es,
+                                  })
+                                : "Seleccionar fecha"}
                             </Button>
                           </DatePopoverTrigger>
-                          <DatePopoverContent className="w-auto p-0" align="start">
+                          <DatePopoverContent
+                            className="w-auto p-0"
+                            align="start"
+                          >
                             <Calendar
                               mode="single"
                               selected={tempDateRange?.from}
-                              onSelect={(date) => setTempDateRange({ ...tempDateRange, from: date })}
+                              onSelect={(date) =>
+                                setTempDateRange({
+                                  ...tempDateRange,
+                                  from: date,
+                                })
+                              }
                               initialFocus
                             />
                           </DatePopoverContent>
                         </DatePopover>
                       </div>
                       <div>
-                        <Label htmlFor="date-to" className="text-sm">Hasta</Label>
+                        <Label htmlFor="date-to" className="text-sm">
+                          Hasta
+                        </Label>
                         <DatePopover>
                           <DatePopoverTrigger asChild>
                             <Button
@@ -345,22 +488,27 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
                               variant="outline"
                               className={cn(
                                 "w-full justify-start text-left font-normal",
-                                !tempDateRange?.to && "text-muted-foreground"
+                                !tempDateRange?.to && "text-muted-foreground",
                               )}
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {tempDateRange?.to ? (
-                                format(tempDateRange.to, "PPP", { locale: es })
-                              ) : (
-                                "Seleccionar fecha"
-                              )}
+                              {tempDateRange?.to
+                                ? format(tempDateRange.to, "PPP", {
+                                    locale: es,
+                                  })
+                                : "Seleccionar fecha"}
                             </Button>
                           </DatePopoverTrigger>
-                          <DatePopoverContent className="w-auto p-0" align="start">
+                          <DatePopoverContent
+                            className="w-auto p-0"
+                            align="start"
+                          >
                             <Calendar
                               mode="single"
                               selected={tempDateRange?.to}
-                              onSelect={(date) => setTempDateRange({ ...tempDateRange, to: date })}
+                              onSelect={(date) =>
+                                setTempDateRange({ ...tempDateRange, to: date })
+                              }
                               initialFocus
                             />
                           </DatePopoverContent>
@@ -372,10 +520,14 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
 
                 {activeSection === "amount" && (
                   <div className="space-y-3">
-                    <Label className="text-base font-semibold">Rango de monto</Label>
+                    <Label className="text-base font-semibold">
+                      Rango de monto
+                    </Label>
                     <div className="space-y-2">
                       <div>
-                        <Label htmlFor="min-amount" className="text-sm">Mínimo</Label>
+                        <Label htmlFor="min-amount" className="text-sm">
+                          Mínimo
+                        </Label>
                         <Input
                           id="min-amount"
                           type="number"
@@ -385,7 +537,9 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
                         />
                       </div>
                       <div>
-                        <Label htmlFor="max-amount" className="text-sm">Máximo</Label>
+                        <Label htmlFor="max-amount" className="text-sm">
+                          Máximo
+                        </Label>
                         <Input
                           id="max-amount"
                           type="number"
@@ -439,7 +593,7 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
               <X
                 className="h-3 w-3 cursor-pointer"
                 onClick={() => {
-                  setTypeFilter(typeFilter.filter(t => t !== type));
+                  setTypeFilter(typeFilter.filter((t) => t !== type));
                 }}
               />
             </Badge>
@@ -450,7 +604,7 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
               <X
                 className="h-3 w-3 cursor-pointer"
                 onClick={() => {
-                  setCategoryFilter(categoryFilter.filter(c => c !== cat));
+                  setCategoryFilter(categoryFilter.filter((c) => c !== cat));
                 }}
               />
             </Badge>
@@ -461,14 +615,15 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
               <X
                 className="h-3 w-3 cursor-pointer"
                 onClick={() => {
-                  setAccountFilter(accountFilter.filter(a => a !== acc));
+                  setAccountFilter(accountFilter.filter((a) => a !== acc));
                 }}
               />
             </Badge>
           ))}
           {dateRange?.from && (
             <Badge variant="secondary" className="gap-1">
-              {dateRange.from.toLocaleDateString()} - {dateRange.to?.toLocaleDateString()}
+              {dateRange.from.toLocaleDateString()} -{" "}
+              {dateRange.to?.toLocaleDateString()}
               <X
                 className="h-3 w-3 cursor-pointer"
                 onClick={() => setDateRange({})}
@@ -498,69 +653,104 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
         </div>
       )}
 
-      <div className="space-y-6">
-        {paginatedGroups.map((group) => (
-          <div key={group.date} className="space-y-2">
-            <div className="flex items-center justify-between border-b pb-2">
-              <h3 className="font-semibold">{group.date}</h3>
-              <span
-                className={`text-sm font-medium ${
-                  group.total >= 0 ? "text-green-600" : "text-red-600"
-                }`}
-              >
-                {group.total >= 0 ? "+" : ""}${group.total.toFixed(2)}
-              </span>
-            </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-12">
+              <Checkbox
+                checked={isAllSelected}
+                indeterminate={isSomeSelected}
+                onCheckedChange={toggleSelectAll}
+              />
+            </TableHead>
+            <TableHead>Transacción</TableHead>
+            <TableHead>Categoría</TableHead>
+            <TableHead className="text-right">Cantidad</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {paginatedGroups.map((group) => {
+            const groupIds = group.transactions.map((t) => t.id);
+            const allGroupSelected = groupIds.every((id) =>
+              selectedIds.has(id),
+            );
+            const someGroupSelected =
+              groupIds.some((id) => selectedIds.has(id)) && !allGroupSelected;
 
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Categoría</TableHead>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead className="text-right">Monto</TableHead>
+            return (
+              <Fragment key={group.date}>
+                <TableRow className="bg-muted/50 hover:bg-muted/50">
+                  <TableCell>
+                    <Checkbox
+                      checked={allGroupSelected}
+                      indeterminate={someGroupSelected}
+                      onCheckedChange={() => toggleSelectGroup(group.date)}
+                    />
+                  </TableCell>
+                  <TableCell colSpan={2} className="font-semibold">
+                    {group.date}
+                  </TableCell>
+                  <TableCell
+                    className={`text-right font-medium ${
+                      group.total >= 0 ? "text-green-600" : "text-red-600"
+                    }`}
+                  >
+                    {group.total >= 0 ? "+" : ""}${group.total.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
                 {group.transactions.map((transaction) => (
                   <TableRow key={transaction.id}>
                     <TableCell>
-                      <Badge
-                        variant={transaction.type === "income" ? "default" : "destructive"}
-                      >
-                        {transaction.type === "income" ? "Ingreso" : "Gasto"}
-                      </Badge>
+                      <Checkbox
+                        checked={selectedIds.has(transaction.id)}
+                        onCheckedChange={() =>
+                          toggleSelectTransaction(transaction.id)
+                        }
+                      />
                     </TableCell>
-                    <TableCell>{transaction.category}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {transaction.description || "-"}
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="font-medium">
+                          {transaction.description}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {transaction.account}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{transaction.category}</Badge>
                     </TableCell>
                     <TableCell
                       className={`text-right font-medium ${
-                        transaction.type === "income" ? "text-green-600" : "text-red-600"
+                        transaction.type === "income"
+                          ? "text-green-600"
+                          : "text-red-600"
                       }`}
                     >
                       {transaction.type === "income" ? "+" : "-"}$
-                      {transaction.amount.toFixed(2)}
+                      {transaction.amount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </TableCell>
                   </TableRow>
                 ))}
-              </TableBody>
-            </Table>
-          </div>
-        ))}
+              </Fragment>
+            );
+          })}
+        </TableBody>
+      </Table>
 
-        {groupedData.length === 0 && (
-          <div className="py-12 text-center text-muted-foreground">
-            No se encontraron transacciones
-          </div>
-        )}
-      </div>
+      {groupedData.length === 0 && (
+        <div className="py-12 text-center text-muted-foreground">
+          No se encontraron transacciones
+        </div>
+      )}
 
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Filas por página:</span>
+            <span className="text-sm text-muted-foreground">
+              Filas por página:
+            </span>
             <select
               value={pageSize}
               onChange={(e) => {
@@ -616,6 +806,54 @@ export function TransactionsDataTable({ transactions }: TransactionsDataTablePro
           </div>
         </div>
       )}
+
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+          <div className="bg-card text-card-foreground border rounded-lg shadow-lg px-4 py-3 flex items-center gap-4">
+            <Checkbox
+              checked={true}
+              onCheckedChange={() => setSelectedIds(new Set())}
+            />
+            <span className="font-medium">
+              {selectedIds.size}{" "}
+              {selectedIds.size === 1
+                ? "transacción seleccionada"
+                : "transacciones seleccionadas"}
+            </span>
+            <div className="flex gap-2 ml-16">
+              <Button size="icon" variant="ghost">
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de eliminar {selectedIds.size}{" "}
+              {selectedIds.size === 1 ? "transacción" : "transacciones"}. Esta
+              acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteSelected}>
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

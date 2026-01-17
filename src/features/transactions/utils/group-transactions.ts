@@ -1,9 +1,13 @@
 import { Transaction } from "../types/transaction";
 
 export function groupTransactionsByDate(transactions: Transaction[]) {
+  const sorted = [...transactions].sort((a, b) => 
+    new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+
   const grouped = new Map<string, Transaction[]>();
 
-  transactions.forEach((transaction) => {
+  sorted.forEach((transaction) => {
     const dateKey = new Date(transaction.date).toLocaleDateString("es-ES", {
       year: "numeric",
       month: "long",

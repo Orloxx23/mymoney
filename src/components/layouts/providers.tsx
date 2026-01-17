@@ -1,5 +1,6 @@
 "use client";
 
+import { Toaster } from "@/ui/sonner";
 import { ProgressProvider } from "@bprogress/next/app";
 import React from "react";
 
@@ -12,6 +13,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       shallowRouting
       spinnerPosition="top-left"
     >
+      <Toaster />
       {children}
     </ProgressProvider>
   );
