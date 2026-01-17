@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Transaction } from "../services/transaction-service";
+import type { Transaction } from "../types/transaction";
 
 export function useTransactions(initialTransactions: Transaction[]) {
   const [transactions, setTransactions] = useState(initialTransactions);
