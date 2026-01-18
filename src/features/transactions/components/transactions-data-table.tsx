@@ -22,7 +22,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Label } from "@/ui/label";
 import { Checkbox } from "@/ui/checkbox";
-import { Search, Filter, X, CalendarIcon, Trash2, Pencil } from "lucide-react";
+import { Search, Filter, X, CalendarIcon, Trash2, Pencil, Receipt, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -42,6 +42,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/ui/alert-dialog";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@/ui/empty";
 import { toast } from "sonner";
 
 type FilterSection = "type" | "category" | "date" | "amount" | "account";
@@ -49,11 +56,13 @@ type FilterSection = "type" | "category" | "date" | "amount" | "account";
 interface TransactionsDataTableProps {
   transactions: Transaction[];
   onDeleteTransactions: (ids: string[]) => void;
+  onAddTransaction?: () => void;
 }
 
 export function TransactionsDataTable({
   transactions,
   onDeleteTransactions,
+  onAddTransaction,
 }: TransactionsDataTableProps) {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<("income" | "expense")[]>([]);
@@ -690,7 +699,7 @@ export function TransactionsDataTable({
                   </TableCell>
                 </TableRow>
                 {group.transactions.map((transaction) => (
-                  <TableRow key={transaction.id}>
+                  <TableRow key={transaction.id} className="hover:bg-background">
                     <TableCell>
                       <Checkbox
                         checked={selectedIds.has(transaction.id)}
@@ -715,11 +724,11 @@ export function TransactionsDataTable({
                     <TableCell
                       className={`text-right font-medium ${
                         transaction.type === "income"
-                          ? "text-green-600"
-                          : "text-red-600"
+                          ? "text-foreground"
+                          : "text-foreground/80"
                       }`}
                     >
-                      {transaction.type === "income" ? "+" : "-"}$
+                      {transaction.type === "income" ? "" : "-"}$
                       {transaction.amount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </TableCell>
                   </TableRow>
@@ -731,9 +740,25 @@ export function TransactionsDataTable({
       </Table>
 
       {groupedData.length === 0 && (
-        <div className="py-12 text-center text-muted-foreground">
-          No se encontraron transacciones
-        </div>
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <Receipt />
+            </EmptyMedia>
+            <EmptyTitle>No hay transacciones</EmptyTitle>
+            <EmptyDescription>
+              {hasActiveFilters
+                ? "No se encontraron transacciones con los filtros aplicados"
+                : "Comienza agregando tu primera transacción"}
+            </EmptyDescription>
+          </EmptyHeader>
+          {onAddTransaction && (
+            <Button onClick={onAddTransaction}>
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar transacción
+            </Button>
+          )}
+        </Empty>
       )}
 
       {totalPages > 1 && (

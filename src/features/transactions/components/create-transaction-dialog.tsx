@@ -10,6 +10,7 @@ import { Textarea } from "@/ui/textarea";
 import { Plus } from "lucide-react";
 import { Transaction } from "../types/transaction";
 import { toast } from "sonner";
+import { createTransactionAction } from "../actions/create-transaction";
 
 interface CreateTransactionDialogProps {
   accounts: Array<{ id: string; name: string }>;
@@ -46,24 +47,20 @@ export function CreateTransactionDialog({ accounts, categories, onOptimisticCrea
       account: formData.get("account") as string,
     };
 
-    onOptimisticCreate?.(newTransaction);
     setOpen(false);
+    onOptimisticCreate?.(newTransaction);
 
     const data = {
       type,
       amount: newTransaction.amount,
       category: categoryName,
-      description: formData.get("description"),
+      description: formData.get("description") as string,
       date: dateTime.toISOString(),
       account: newTransaction.account,
     };
 
     try {
-      await fetch("/api/transactions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+      await createTransactionAction(data);
     } catch {
       toast.error("Error al crear la transacción");
     } finally {

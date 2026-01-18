@@ -39,9 +39,8 @@ export function TransactionsWrapper({
   );
 
   function handleCreateTransaction(transaction: Transaction) {
-    startTransition(async () => {
+    startTransition(() => {
       updateOptimistic({ type: "add", transaction });
-      await onRefresh();
     });
   }
 
