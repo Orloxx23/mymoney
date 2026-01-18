@@ -13,6 +13,7 @@ export async function createTransactionAction(data: {
 }) {
   await createTransaction({
     ...data,
+    description: data.description || "Sin descripción",
     date: new Date(data.date),
   });
   revalidatePath("/transactions", "page");
