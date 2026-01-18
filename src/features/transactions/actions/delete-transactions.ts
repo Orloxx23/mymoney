@@ -5,5 +5,5 @@ import { deleteTransactions } from "../services/transaction-service";
 
 export async function deleteTransactionsAction(ids: string[]) {
   await deleteTransactions(ids);
-  revalidatePath("/", "page");
+  revalidatePath("/transactions", "page");
 }

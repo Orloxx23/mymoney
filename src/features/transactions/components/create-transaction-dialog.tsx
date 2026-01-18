@@ -14,11 +14,10 @@ import { toast } from "sonner";
 interface CreateTransactionDialogProps {
   accounts: Array<{ id: string; name: string }>;
   categories: Array<{ id: string; name: string; type: string; parentId?: string }>;
-  onSuccess?: () => void;
   onOptimisticCreate?: (transaction: Transaction) => void;
 }
 
-export function CreateTransactionDialog({ accounts, categories, onSuccess, onOptimisticCreate }: CreateTransactionDialogProps) {
+export function CreateTransactionDialog({ accounts, categories, onOptimisticCreate }: CreateTransactionDialogProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [type, setType] = useState<"income" | "expense">("expense");
@@ -65,7 +64,6 @@ export function CreateTransactionDialog({ accounts, categories, onSuccess, onOpt
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      onSuccess?.();
     } catch {
       toast.error("Error al crear la transacción");
     } finally {

@@ -4,41 +4,70 @@ import { Transaction } from "@/features/transactions/types/transaction";
 import { TransactionsDataTable } from "@/features/transactions/components/transactions-data-table";
 import { CreateTransactionDialog } from "@/features/transactions/components/create-transaction-dialog";
 import { useOptimistic, startTransition } from "react";
+import { CreateAccountDialog } from "@/features/accounts/components/create-account-dialog";
 
 interface TransactionsWrapperProps {
   initialTransactions: Transaction[];
   accounts: Array<{ id: string; name: string }>;
-  categories: Array<{ id: string; name: string; type: string; parentId?: string }>;
+  categories: Array<{
+    id: string;
+    name: string;
+    type: string;
+    parentId?: string;
+  }>;
   onRefresh: () => void;
 }
 
-export function TransactionsWrapper({ 
-  initialTransactions, 
-  accounts, 
+type OptimisticAction =
+  | { type: "add"; transaction: Transaction }
+  | { type: "delete"; ids: string[] };
+
+export function TransactionsWrapper({
+  initialTransactions,
+  accounts,
   categories,
-  onRefresh 
+  onRefresh,
 }: TransactionsWrapperProps) {
-  const [optimisticTransactions, addOptimisticTransaction] = useOptimistic(
+  const [optimisticTransactions, updateOptimistic] = useOptimistic(
     initialTransactions,
-    (state, newTransaction: Transaction) => [newTransaction, ...state]
+    (state, action: OptimisticAction) => {
+      if (action.type === "add") {
+        return [action.transaction, ...state];
+      }
+      return state.filter((t) => !action.ids.includes(t.id));
+    },
   );
 
   function handleCreateTransaction(transaction: Transaction) {
+    startTransition(async () => {
+      updateOptimistic({ type: "add", transaction });
+      await onRefresh();
+    });
+  }
+
+  function handleDeleteTransactions(ids: string[]) {
     startTransition(() => {
-      addOptimisticTransaction(transaction);
-      onRefresh();
+      updateOptimistic({ type: "delete", ids });
     });
   }
 
   return (
-    <>
-      <CreateTransactionDialog
-        accounts={accounts}
-        categories={categories}
-        onSuccess={onRefresh}
-        onOptimisticCreate={handleCreateTransaction}
+    <div className="flex flex-col gap-4">
+      <div className="w-full flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Transacciones</h1>
+        <div className="flex gap-2">
+          <CreateAccountDialog onSuccess={onRefresh} />
+          <CreateTransactionDialog
+            accounts={accounts}
+            categories={categories}
+            onOptimisticCreate={handleCreateTransaction}
+          />
+        </div>
+      </div>
+      <TransactionsDataTable
+        transactions={optimisticTransactions}
+        onDeleteTransactions={handleDeleteTransactions}
       />
-      <TransactionsDataTable transactions={optimisticTransactions} />
-    </>
+    </div>
   );
 }

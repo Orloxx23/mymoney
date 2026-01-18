@@ -2,6 +2,9 @@ import { google } from "googleapis";
 import { auth } from "./auth";
 import { unstable_cache } from "next/cache";
 
+let folderPromise: Promise<string> | null = null;
+let spreadsheetPromise: Promise<string> | null = null;
+
 function createOAuth2Client(accessToken: string, refreshToken?: string) {
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
@@ -27,22 +30,24 @@ export function getGoogleSheetsClientWithToken(accessToken: string, refreshToken
 }
 
 async function getOrCreateFolderInternal(accessToken: string, refreshToken?: string) {
-  const oauth2Client = createOAuth2Client(accessToken, refreshToken);
-  const drive = google.drive({ version: "v3", auth: oauth2Client });
-  const FOLDER_NAME = "MyMoney";
+  if (folderPromise) return folderPromise;
 
-  // Buscar carpeta principal
-  const { data } = await drive.files.list({
-    q: `name='${FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-    fields: "files(id, name)",
-  });
+  folderPromise = (async () => {
+    const oauth2Client = createOAuth2Client(accessToken, refreshToken);
+    const drive = google.drive({ version: "v3", auth: oauth2Client });
+    const FOLDER_NAME = "MyMoney";
 
-  let folderId: string;
+    const { data } = await drive.files.list({
+      q: `name='${FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false and 'me' in owners`,
+      fields: "files(id, name, createdTime)",
+      orderBy: "createdTime",
+      pageSize: 1,
+    });
 
-  if (data.files && data.files.length > 0) {
-    folderId = data.files[0].id!;
-  } else {
-    // Crear carpeta principal
+    if (data.files && data.files.length > 0) {
+      return data.files[0].id!;
+    }
+
     const folder = await drive.files.create({
       requestBody: {
         name: FOLDER_NAME,
@@ -50,9 +55,8 @@ async function getOrCreateFolderInternal(accessToken: string, refreshToken?: str
       },
       fields: "id",
     });
-    folderId = folder.data.id!;
+    const folderId = folder.data.id!;
 
-    // Crear subcarpeta storage
     await drive.files.create({
       requestBody: {
         name: "storage",
@@ -60,13 +64,17 @@ async function getOrCreateFolderInternal(accessToken: string, refreshToken?: str
         parents: [folderId],
       },
     });
-  }
 
-  return folderId;
+    return folderId;
+  })();
+
+  return folderPromise;
 }
 
-const getCachedSpreadsheetId = unstable_cache(
-  async (accessToken: string, refreshToken: string | undefined): Promise<string> => {
+async function getOrCreateSpreadsheetInternal(accessToken: string, refreshToken: string | undefined): Promise<string> {
+  if (spreadsheetPromise) return spreadsheetPromise;
+
+  spreadsheetPromise = (async () => {
     const oauth2Client = createOAuth2Client(accessToken, refreshToken);
     const drive = google.drive({ version: "v3", auth: oauth2Client });
     const sheets = google.sheets({ version: "v4", auth: oauth2Client });
@@ -153,13 +161,13 @@ const getCachedSpreadsheetId = unstable_cache(
     });
 
     return spreadsheetId;
-  },
-  ["spreadsheet-id"],
-  { revalidate: 3600, tags: ["spreadsheet"] }
-);
+  })();
+
+  return spreadsheetPromise;
+}
 
 export async function getOrCreateSpreadsheet(): Promise<string> {
   const session = await auth();
   if (!session?.accessToken) throw new Error("No access token");
-  return getCachedSpreadsheetId(session.accessToken, session.refreshToken);
+  return getOrCreateSpreadsheetInternal(session.accessToken, session.refreshToken);
 }

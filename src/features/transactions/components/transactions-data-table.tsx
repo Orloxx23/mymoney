@@ -4,8 +4,6 @@ import {
   useState,
   useMemo,
   Fragment,
-  useOptimistic,
-  startTransition,
 } from "react";
 import { Transaction } from "../types/transaction";
 import { groupTransactionsByDate } from "../utils/group-transactions";
@@ -50,17 +48,13 @@ type FilterSection = "type" | "category" | "date" | "amount" | "account";
 
 interface TransactionsDataTableProps {
   transactions: Transaction[];
+  onDeleteTransactions: (ids: string[]) => void;
 }
 
 export function TransactionsDataTable({
   transactions,
+  onDeleteTransactions,
 }: TransactionsDataTableProps) {
-  const [optimisticTransactions, setOptimisticTransactions] = useOptimistic(
-    transactions,
-    (state, deletedIds: string[]) =>
-      state.filter((t) => !deletedIds.includes(t.id)),
-  );
-
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<("income" | "expense")[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
@@ -88,7 +82,7 @@ export function TransactionsDataTable({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const filteredTransactions = useMemo(() => {
-    return optimisticTransactions.filter((t) => {
+    return transactions.filter((t) => {
       const matchesSearch =
         search === "" ||
         t.description.toLowerCase().includes(search.toLowerCase()) ||
@@ -121,7 +115,7 @@ export function TransactionsDataTable({
       );
     });
   }, [
-    optimisticTransactions,
+    transactions,
     search,
     typeFilter,
     categoryFilter,
@@ -156,13 +150,13 @@ export function TransactionsDataTable({
   const totalPages = Math.ceil(groupedData.length / pageSize);
 
   const categories = useMemo(
-    () => Array.from(new Set(optimisticTransactions.map((t) => t.category))),
-    [optimisticTransactions],
+    () => Array.from(new Set(transactions.map((t) => t.category))),
+    [transactions],
   );
 
   const accounts = useMemo(
-    () => Array.from(new Set(optimisticTransactions.map((t) => t.account))),
-    [optimisticTransactions],
+    () => Array.from(new Set(transactions.map((t) => t.account))),
+    [transactions],
   );
 
   const hasActiveFilters =
@@ -269,16 +263,13 @@ export function TransactionsDataTable({
 
   function handleDeleteSelected() {
     const idsToDelete = Array.from(selectedIds);
-
     setShowDeleteDialog(false);
     setSelectedIds(new Set());
 
-    startTransition(() => {
-      setOptimisticTransactions(idsToDelete);
+    onDeleteTransactions(idsToDelete);
 
-      deleteTransactionsAction(idsToDelete).catch(() => {
-        toast.error("Error al eliminar las transacciones");
-      });
+    deleteTransactionsAction(idsToDelete).catch(() => {
+      toast.error("Error al eliminar las transacciones");
     });
   }
 
