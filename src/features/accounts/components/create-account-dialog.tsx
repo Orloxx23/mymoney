@@ -20,6 +20,7 @@ export function CreateAccountDialog({ onSuccess }: { onSuccess?: () => void }) {
     const data = {
       name: formData.get("name"),
       type: formData.get("type"),
+      initialBalance: parseFloat(formData.get("initialBalance") as string) || 0,
     };
 
     try {
@@ -64,6 +65,17 @@ export function CreateAccountDialog({ onSuccess }: { onSuccess?: () => void }) {
                 <SelectItem value="credit">Tarjeta de Crédito</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div>
+            <Label htmlFor="initialBalance">Saldo Inicial</Label>
+            <Input
+              id="initialBalance"
+              name="initialBalance"
+              type="number"
+              step="0.01"
+              defaultValue="0"
+              required
+            />
           </div>
           <Button type="submit" disabled={isLoading} className="w-full">
             {isLoading ? "Creando..." : "Crear Cuenta"}

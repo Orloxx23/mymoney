@@ -5,6 +5,7 @@ export interface Account {
   id: string;
   name: string;
   type: "bank" | "cash" | "credit";
+  initialBalance: number;
 }
 
 const getCachedAccounts = unstable_cache(
@@ -13,15 +14,16 @@ const getCachedAccounts = unstable_cache(
 
   const { data } = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: "Cuentas!A2:C",
+    range: "Cuentas!A2:D",
   });
 
   if (!data.values) return [];
 
-    return data.values.map(([id, name, type]) => ({
+    return data.values.map(([id, name, type, initialBalance]) => ({
       id,
       name,
       type: type as Account["type"],
+      initialBalance: parseFloat(initialBalance) || 0,
     }));
   },
   ["accounts"],
@@ -46,10 +48,10 @@ export async function createAccount(account: Omit<Account, "id">): Promise<Accou
 
   await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: "Cuentas!A:C",
+    range: "Cuentas!A:D",
     valueInputOption: "RAW",
     requestBody: {
-      values: [[newAccount.id, newAccount.name, newAccount.type]],
+      values: [[newAccount.id, newAccount.name, newAccount.type, newAccount.initialBalance]],
     },
   });
 
