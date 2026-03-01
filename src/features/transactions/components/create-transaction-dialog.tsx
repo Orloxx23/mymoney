@@ -81,10 +81,10 @@ export function CreateTransactionDialog({ accounts, categories, onOptimisticCrea
           <DialogTitle>Crear Transacción</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
+          <div className="grid gap-2">
             <Label>Tipo</Label>
             <Select value={type} onValueChange={(v) => setType(v as "income" | "expense")}>
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -93,14 +93,14 @@ export function CreateTransactionDialog({ accounts, categories, onOptimisticCrea
               </SelectContent>
             </Select>
           </div>
-          <div>
+          <div className="grid gap-2">
             <Label htmlFor="amount">Monto</Label>
             <Input id="amount" name="amount" type="number" step="0.01" required />
           </div>
-          <div>
+          <div className="grid gap-2">
             <Label htmlFor="category">Categoría</Label>
             <Select name="category" required>
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Selecciona categoría" />
               </SelectTrigger>
               <SelectContent>
@@ -110,10 +110,10 @@ export function CreateTransactionDialog({ accounts, categories, onOptimisticCrea
               </SelectContent>
             </Select>
           </div>
-          <div>
+          <div className="grid gap-2">
             <Label htmlFor="account">Cuenta</Label>
             <Select name="account" required>
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Selecciona cuenta" />
               </SelectTrigger>
               <SelectContent>
@@ -123,11 +123,11 @@ export function CreateTransactionDialog({ accounts, categories, onOptimisticCrea
               </SelectContent>
             </Select>
           </div>
-          <div>
+          <div className="grid gap-2">
             <Label htmlFor="date">Fecha</Label>
             <Input id="date" name="date" type="date" defaultValue={new Date().toISOString().split('T')[0]} required />
           </div>
-          <div>
+          <div className="grid gap-2">
             <Label htmlFor="description">Descripción</Label>
             <Textarea id="description" name="description" />
           </div>

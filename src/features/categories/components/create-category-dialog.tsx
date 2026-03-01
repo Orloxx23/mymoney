@@ -59,14 +59,14 @@ export function CreateCategoryDialog({ categories = [], onSuccess }: CreateCateg
           <DialogTitle>Crear Categoría</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
+          <div className="grid gap-2">
             <Label htmlFor="name">Nombre</Label>
             <Input id="name" name="name" required />
           </div>
-          <div>
+          <div className="grid gap-2">
             <Label htmlFor="type">Tipo</Label>
             <Select value={type} onValueChange={(v) => setType(v as "income" | "expense")}>
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -75,10 +75,10 @@ export function CreateCategoryDialog({ categories = [], onSuccess }: CreateCateg
               </SelectContent>
             </Select>
           </div>
-          <div>
+          <div className="grid gap-2">
             <Label htmlFor="parentId">Categoría Padre (opcional)</Label>
             <Select name="parentId">
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Sin categoría padre" />
               </SelectTrigger>
               <SelectContent>
@@ -88,7 +88,7 @@ export function CreateCategoryDialog({ categories = [], onSuccess }: CreateCateg
               </SelectContent>
             </Select>
           </div>
-          <div>
+          <div className="grid gap-2">
             <Label htmlFor="color">Color</Label>
             <Input id="color" name="color" type="color" defaultValue="#3b82f6" required />
           </div>

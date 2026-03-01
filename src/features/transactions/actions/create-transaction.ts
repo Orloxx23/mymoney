@@ -17,4 +17,5 @@ export async function createTransactionAction(data: {
     date: new Date(data.date),
   });
   revalidatePath("/transactions", "page");
+  revalidatePath("/", "page");
 }

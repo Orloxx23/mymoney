@@ -49,14 +49,14 @@ export function CreateAccountDialog({ onSuccess }: { onSuccess?: () => void }) {
           <DialogTitle>Crear Cuenta</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
+          <div className="grid gap-2">
             <Label htmlFor="name">Nombre</Label>
             <Input id="name" name="name" required />
           </div>
-          <div>
+          <div className="grid gap-2">
             <Label htmlFor="type">Tipo</Label>
             <Select name="type" required>
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Selecciona tipo" />
               </SelectTrigger>
               <SelectContent>
@@ -66,7 +66,7 @@ export function CreateAccountDialog({ onSuccess }: { onSuccess?: () => void }) {
               </SelectContent>
             </Select>
           </div>
-          <div>
+          <div className="grid gap-2">
             <Label htmlFor="initialBalance">Saldo Inicial</Label>
             <Input
               id="initialBalance"
