@@ -15,9 +15,10 @@ interface TickerItem {
 interface FinancialTickerProps {
   items: TickerItem[];
   className?: string;
+  paused?: boolean;
 }
 
-export function FinancialTicker({ items, className }: FinancialTickerProps) {
+export function FinancialTicker({ items, className, paused }: FinancialTickerProps) {
   const duplicatedItems = [...items, ...items];
 
   const getIconSrc = (flag: string, name: string) => {
@@ -43,7 +44,7 @@ export function FinancialTicker({ items, className }: FinancialTickerProps) {
         className,
       )}
     >
-      <div className="flex animate-[ticker_60s_linear_infinite] absolute left-0 h-full items-center group-hover:[animation-play-state:paused]">
+      <div className={cn("flex animate-[ticker_60s_linear_infinite] absolute left-0 h-full items-center group-hover:paused", paused && "paused")}>
         {duplicatedItems.map((item, index) => {
           const iconSrc = getIconSrc(item.flag, item.name);
 

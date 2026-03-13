@@ -45,7 +45,7 @@ export function AccountsList({ accounts }: AccountsListProps) {
           </EmptyMedia>
           <EmptyTitle>Sin cuentas</EmptyTitle>
           <EmptyDescription>
-            Crea tu primera cuenta para empezar a registrar tus transacciones.
+            Crea tu primera cuenta para empezar a registrar tus movimientos.
           </EmptyDescription>
         </EmptyHeader>
       </Empty>

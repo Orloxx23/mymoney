@@ -97,7 +97,7 @@ async function getOrCreateSpreadsheetInternal(accessToken: string, refreshToken:
         sheets: [
           { properties: { title: "Cuentas" } },
           { properties: { title: "Categorías" } },
-          { properties: { title: "Transacciones" } },
+          { properties: { title: "Movimientos" } },
         ],
       },
     });
@@ -123,7 +123,7 @@ async function getOrCreateSpreadsheetInternal(accessToken: string, refreshToken:
             values: [["ID", "Nombre", "Tipo", "Color", "Padre"]],
           },
           {
-            range: "Transacciones!A1:G1",
+            range: "Movimientos!A1:G1",
             values: [["ID", "Tipo", "Monto", "Categoría", "Descripción", "Fecha", "Cuenta"]],
           },
           {

@@ -24,7 +24,7 @@ export default async function Navbar() {
   const session = await auth();
 
   return (
-    <div className="border-r flex flex-col w-64">
+    <div className="border-r flex flex-col w-64 sticky top-0 h-screen">
       <div className="flex flex-col p-4 gap-4">
         <Link href="/">
           <div

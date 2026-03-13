@@ -62,7 +62,7 @@ export function CreateTransactionDialog({ accounts, categories, onOptimisticCrea
     try {
       await createTransactionAction(data);
     } catch {
-      toast.error("Error al crear la transacción");
+      toast.error("Error al crear el movimiento");
     } finally {
       setIsLoading(false);
     }
@@ -73,12 +73,12 @@ export function CreateTransactionDialog({ accounts, categories, onOptimisticCrea
       <DialogTrigger asChild>
         <Button>
           <Plus className="h-4 w-4" />
-          Nueva Transacción
+          Nuevo Movimiento
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Crear Transacción</DialogTitle>
+          <DialogTitle>Crear Movimiento</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-2">
@@ -132,7 +132,7 @@ export function CreateTransactionDialog({ accounts, categories, onOptimisticCrea
             <Textarea id="description" name="description" />
           </div>
           <Button type="submit" disabled={isLoading} className="w-full">
-            {isLoading ? "Creando..." : "Crear Transacción"}
+            {isLoading ? "Creando..." : "Crear Movimiento"}
           </Button>
         </form>
       </DialogContent>

@@ -1,10 +1,28 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useFinancialTicker } from "../hooks/use-financial-ticker";
 import { FinancialTicker } from "./financial-ticker";
 
 export function FinancialTickerWrapper() {
   const { data, loading } = useFinancialTicker();
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    const check = () => setPaused(!document.hasFocus() || document.hidden);
+
+    const interval = setInterval(check, 1000);
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("focus", check);
+    window.addEventListener("blur", check);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", check);
+      window.removeEventListener("focus", check);
+      window.removeEventListener("blur", check);
+    };
+  }, []);
 
   if (loading || data.length === 0) {
     return (
@@ -28,7 +46,7 @@ export function FinancialTickerWrapper() {
 
   return (
     <div className="border-b">
-      <FinancialTicker items={data} />
+      <FinancialTicker items={data} paused={paused} />
     </div>
   );
 }

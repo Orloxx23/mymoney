@@ -27,9 +27,11 @@ export default async function RootLayout({
       <body className={`${inter.className} antialiased bg-background`}>
         <Providers>
           {session ? (
-            <div className="flex container mx-auto border-l border-r min-h-screen">
+            <div className="flex container mx-auto border-l border-r min-h-screen relative">
               <Navbar />
-              <main className="flex-1">{children}</main>
+              <main className="flex-1 overflow-y-auto">
+                  {children}
+              </main>
             </div>
           ) : (
             <div className="flex container mx-auto border-l border-r min-h-screen">

@@ -7,7 +7,7 @@ import { ArrowDownUp, House, Tag, Wallet } from "lucide-react";
 const navItems = [
   { label: "Inicio", href: "/", icon: <House size={16} /> },
   {
-    label: "Transacciones",
+    label: "Movimientos",
     href: "/transactions",
     icon: <ArrowDownUp size={16} />,
   },

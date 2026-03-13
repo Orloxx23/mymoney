@@ -8,7 +8,7 @@ const getCachedTransactions = unstable_cache(
 
   const { data } = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: "Transacciones!A2:G",
+    range: "Movimientos!A2:G",
   });
 
   if (!data.values) return [];
@@ -36,6 +36,37 @@ export async function getTransactions(): Promise<Transaction[]> {
   return getCachedTransactions(session.accessToken, session.refreshToken, spreadsheetId);
 }
 
+interface PaginatedResult {
+  transactions: Transaction[];
+  nextCursor: string | null;
+  total: number;
+}
+
+export async function getTransactionsPaginated({
+  cursor,
+  limit = 50,
+}: {
+  cursor?: string;
+  limit?: number;
+} = {}): Promise<PaginatedResult> {
+  const all = await getTransactions();
+  const sorted = all.sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+
+  let startIndex = 0;
+  if (cursor) {
+    const cursorIndex = sorted.findIndex((t) => t.id === cursor);
+    if (cursorIndex !== -1) startIndex = cursorIndex + 1;
+  }
+
+  const page = sorted.slice(startIndex, startIndex + limit);
+  const nextCursor = page.length === limit ? page[page.length - 1].id : null;
+
+  return { transactions: page, nextCursor, total: sorted.length };
+}
+
+
 export async function createTransaction(transaction: Omit<Transaction, "id">): Promise<Transaction> {
   const sheets = await getGoogleSheetsClient();
   const spreadsheetId = await getOrCreateSpreadsheet();
@@ -45,7 +76,7 @@ export async function createTransaction(transaction: Omit<Transaction, "id">): P
 
   await sheets.spreadsheets.values.append({
     spreadsheetId,
-    range: "Transacciones!A:G",
+    range: "Movimientos!A:G",
     valueInputOption: "RAW",
     requestBody: {
       values: [[
@@ -69,12 +100,12 @@ export async function deleteTransactions(ids: string[]): Promise<void> {
 
   const { data: sheetData } = await sheets.spreadsheets.get({
     spreadsheetId,
-    ranges: ["Transacciones"],
+    ranges: ["Movimientos"],
     fields: "sheets(properties(sheetId,title))",
   });
 
   const transactionsSheet = sheetData.sheets?.find(
-    (s) => s.properties?.title === "Transacciones"
+    (s) => s.properties?.title === "Movimientos"
   );
   const sheetId = transactionsSheet?.properties?.sheetId;
 
@@ -82,7 +113,7 @@ export async function deleteTransactions(ids: string[]): Promise<void> {
 
   const { data } = await sheets.spreadsheets.values.get({
     spreadsheetId,
-    range: "Transacciones!A2:G",
+    range: "Movimientos!A2:G",
   });
 
   if (!data.values) return;
